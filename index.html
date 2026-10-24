@@ -1,0 +1,1631 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Executivo - Gestão de Afastamentos Ocupacionais</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Phosphor Icons CDN -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  
+  <!-- SheetJS (xlsx) para leitura autônoma de planilhas -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .dark ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .dark ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- TOP HEADER COM ALTERNÂNCIA DE TEMA CLARO/ESCURO -->
+  <header class="border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-4 lg:px-8 py-3.5 transition-colors">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      
+      <!-- Brand & Título -->
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white text-2xl font-bold flex-shrink-0">
+          <i class="ph-bold ph-shield-check"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-extrabold text-lg lg:text-xl text-slate-900 dark:text-white tracking-tight">HSE & Saúde Ocupacional</h1>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+              Planta Ativa
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Indicadores Gerenciais de Afastamento INSS (B91 Acidentário / B31 Comum)</p>
+        </div>
+      </div>
+
+      <!-- Barra de Ferramentas: Tema Claro/Escuro, Upload Excel & Reset -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        
+        <!-- Botão Toggle Tema Claro / Escuro -->
+        <button id="themeToggleBtn" onclick="toggleTheme()" class="inline-flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition shadow-sm" title="Alternar Modo Claro / Escuro">
+          <i id="themeIcon" class="ph-bold ph-sun text-amber-500 text-base"></i>
+          <span id="themeText">Modo Claro</span>
+        </button>
+
+        <!-- Importar Planilha Excel -->
+        <label for="excelFileInput" class="cursor-pointer inline-flex items-center gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-xl transition duration-150 shadow-sm">
+          <i class="ph-bold ph-file-xls text-base"></i>
+          <span>Carregar Excel / XLSM</span>
+          <input type="file" id="excelFileInput" accept=".xlsm, .xlsx, .xls, .csv" class="hidden">
+        </label>
+
+        <!-- Limpar Filtros -->
+        <button onclick="resetFilters()" class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-xl transition">
+          <i class="ph-bold ph-arrow-counter-clockwise"></i> Limpar
+        </button>
+
+        <div id="dataBadge" class="hidden sm:flex text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 px-3 py-2 rounded-xl items-center gap-1.5">
+          <i class="ph-bold ph-database text-blue-500"></i>
+          <span id="dataBadgeText">Dados Mockados Carregados</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- FILTROS GLOBAIS DINÂMICOS -->
+  <section class="max-w-7xl w-full mx-auto px-4 lg:px-8 pt-5 pb-2">
+    <div class="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm dark:shadow-xl backdrop-blur-md transition-colors">
+      <div class="text-xs uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400 mb-3 flex items-center justify-between">
+        <span class="flex items-center gap-1.5"><i class="ph-bold ph-funnel text-blue-500"></i> Filtros Globais da Planta</span>
+        <span class="text-[11px] text-blue-600 dark:text-blue-400 font-bold" id="filterCount">0 registros</span>
+      </div>
+      
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <!-- Filtro Shop -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Área / Shop</label>
+          <select id="filterShop" onchange="applyFilters()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none transition">
+            <option value="ALL">Todos os Shops (Planta Global)</option>
+          </select>
+        </div>
+
+        <!-- Filtro Benefício -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Tipo de Benefício</label>
+          <select id="filterBeneficio" onchange="applyFilters()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none transition">
+            <option value="ALL">B91 & B31 (Todos)</option>
+            <option value="B91">B91 - Acidentário / Ocupacional</option>
+            <option value="B31">B31 - Doença Comum / Não Ocupacional</option>
+          </select>
+        </div>
+
+        <!-- Filtro Vínculo -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Vínculo Operacional</label>
+          <select id="filterVinculo" onchange="applyFilters()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none transition">
+            <option value="ALL">Todos os Vínculos</option>
+            <option value="Direto">Direto (Linha de Montagem)</option>
+            <option value="Semidireto">Semidireto (Suporte / Qualidade / Linha)</option>
+            <option value="Indireto">Indireto (Escritório / Administrativo)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTEÚDO PRINCIPAL (DASHBOARD) -->
+  <main class="max-w-7xl w-full mx-auto px-4 lg:px-8 py-4 space-y-6 flex-1">
+
+    <!-- SEÇÃO 1: CARDS DE KPI DE TOPO -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Card Total Ativos -->
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl relative overflow-hidden group shadow-sm dark:shadow-lg transition">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Afastados Ativos</span>
+          <div class="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+            <i class="ph-bold ph-user-minus text-xl"></i>
+          </div>
+        </div>
+        <div class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight" id="kpiTotalAtivos">0</div>
+        <div class="mt-2 text-xs flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+          <span id="kpiTaxaPrevalencia" class="text-emerald-600 dark:text-emerald-400 font-semibold">--%</span>
+          <span>sobre a força de trabalho ativa</span>
+        </div>
+      </div>
+
+      <!-- Card Entradas no Mês -->
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl relative overflow-hidden group shadow-sm dark:shadow-lg transition">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Novas Entradas (Mês)</span>
+          <div class="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+            <i class="ph-bold ph-arrow-circle-up text-xl"></i>
+          </div>
+        </div>
+        <div class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight" id="kpiEntradasMes">0</div>
+        <div class="mt-2 text-xs flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium" id="kpiTopShopEntrada">
+          Top entrada: --
+        </div>
+      </div>
+
+      <!-- Card Retornos (Saídas) do INSS -->
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl relative overflow-hidden group shadow-sm dark:shadow-lg transition">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Retornos / Saídas (Mês)</span>
+          <div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <i class="ph-bold ph-arrow-circle-down text-xl"></i>
+          </div>
+        </div>
+        <div class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight" id="kpiSaidasMes">0</div>
+        <div class="mt-2 text-xs flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium" id="kpiSaldoMes">
+          Saldo líquido: 0
+        </div>
+      </div>
+
+      <!-- Card Taxa B91 Acidentário -->
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl relative overflow-hidden group shadow-sm dark:shadow-lg transition">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Fator B91 (Acidentário)</span>
+          <div class="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+            <i class="ph-bold ph-warning-circle text-xl"></i>
+          </div>
+        </div>
+        <div class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight" id="kpiTaxaB91">0%</div>
+        <div class="mt-2 text-xs flex items-center justify-between text-slate-500 dark:text-slate-400 font-medium">
+          <span id="kpiB91Contagem" class="text-amber-600 dark:text-amber-400">0 B91</span>
+          <span id="kpiB31Contagem" class="text-blue-600 dark:text-blue-400">0 B31</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- SEÇÃO 2: HISTÓRICO 12 MESES & VÍNCULO OPERACIONAL -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Gráfico Overview 12 Meses (com destaque evidente dos 3 últimos meses) -->
+      <div class="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl flex flex-col justify-between transition">
+        <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 gap-2">
+            <div>
+              <h2 class="text-sm font-bold text-slate-900 dark:text-white tracking-wide uppercase flex items-center gap-2">
+                <i class="ph-bold ph-chart-bar text-blue-500"></i>
+                Evolução Mensal de Afastamentos (12 Meses)
+              </h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Barras destacadas em cor âmbar sinalizam os 3 últimos meses</p>
+            </div>
+            
+            <div class="flex items-center gap-3 text-xs">
+              <span class="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                <span class="w-3 h-3 rounded bg-slate-400 dark:bg-slate-600 inline-block"></span> Histórico
+              </span>
+              <span class="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-bold">
+                <span class="w-3 h-3 rounded bg-amber-500 inline-block shadow-sm"></span> Últimos 3 Meses
+              </span>
+            </div>
+          </div>
+
+          <div class="relative w-full h-[280px] pt-4">
+            <canvas id="chartEvolucaoMensal"></canvas>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
+          <span>Acompanhamento da curva de sinistralidade e FAP</span>
+          <span class="font-semibold text-slate-600 dark:text-slate-300">Fonte: SESMT / Gestão Integrada</span>
+        </div>
+      </div>
+
+      <!-- Distribuição por Vínculo Operacional (Direto, Semidireto, Indireto) -->
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl flex flex-col justify-between transition">
+        <div>
+          <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+            <h2 class="text-sm font-bold text-slate-900 dark:text-white tracking-wide uppercase flex items-center gap-2">
+              <i class="ph-bold ph-identification-badge text-indigo-500"></i>
+              Vínculo Operacional
+            </h2>
+            <span class="text-[11px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-600 dark:text-slate-300 font-semibold">Perfil</span>
+          </div>
+          
+          <div class="relative w-full h-[200px] my-2">
+            <canvas id="chartVinculo"></canvas>
+          </div>
+        </div>
+
+        <!-- Mini Cards com Métricas de Vínculo -->
+        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200 dark:border-slate-800 text-center">
+          <div class="bg-slate-50 dark:bg-slate-800/40 p-2 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Direto (Linha)</div>
+            <div class="text-sm font-bold text-blue-600 dark:text-blue-400" id="vinculoDiretoVal">0</div>
+            <div class="text-[10px] text-slate-400" id="vinculoDiretoPct">0%</div>
+          </div>
+          <div class="bg-slate-50 dark:bg-slate-800/40 p-2 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Semidireto</div>
+            <div class="text-sm font-bold text-cyan-600 dark:text-cyan-400" id="vinculoSemiVal">0</div>
+            <div class="text-[10px] text-slate-400" id="vinculoSemiPct">0%</div>
+          </div>
+          <div class="bg-slate-50 dark:bg-slate-800/40 p-2 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Indireto</div>
+            <div class="text-sm font-bold text-purple-600 dark:text-purple-400" id="vinculoIndiretoVal">0</div>
+            <div class="text-[10px] text-slate-400" id="vinculoIndiretoPct">0%</div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- SEÇÃO 3: SHOPS (DESTAQUE DO MAIS AFETADO COM QUANTIDADE E %) E BENEFÍCIO (B91 VS B31) -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Ranking de Afastados por Shop com Destaque Crítico -->
+      <div class="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl transition">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 gap-2">
+          <div>
+            <h2 class="text-sm font-bold text-slate-900 dark:text-white tracking-wide uppercase flex items-center gap-2">
+              <i class="ph-bold ph-factory text-amber-500"></i>
+              Afastados por Shop / Unidade Industrial
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Visão consolidada por setor com destaque para a área de maior impacto</p>
+          </div>
+
+          <!-- Badge do Shop Mais Afetado -->
+          <div id="badgeShopCritico" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+            <i class="ph-bold ph-warning-diamond text-base"></i>
+            <span>Maior Volume: <strong id="topShopNome">--</strong></span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 pt-4 items-center">
+          <div class="md:col-span-7 h-[260px] relative">
+            <canvas id="chartShops"></canvas>
+          </div>
+          
+          <div class="md:col-span-5 space-y-2.5 max-h-[260px] overflow-y-auto pr-1" id="shopTableList">
+            <!-- Gerado via JS dinamicamente -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Benefício: B91 vs B31 -->
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl flex flex-col justify-between transition">
+        <div>
+          <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+            <h2 class="text-sm font-bold text-slate-900 dark:text-white tracking-wide uppercase flex items-center gap-2">
+              <i class="ph-bold ph-scales text-emerald-500"></i>
+              Benefício INSS: B91 vs B31
+            </h2>
+            <span class="text-[11px] text-slate-500 dark:text-slate-400">Proporção</span>
+          </div>
+
+          <div class="relative w-full h-[200px] my-3">
+            <canvas id="chartBeneficio"></canvas>
+          </div>
+        </div>
+
+        <div class="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+          <div class="flex items-center justify-between text-xs p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-amber-500/20">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+              <span class="font-medium text-slate-700 dark:text-slate-200">B91 (Acidentário)</span>
+            </div>
+            <div class="font-bold text-amber-600 dark:text-amber-400" id="detalheB91Txt">0 (0%)</div>
+          </div>
+          
+          <div class="flex items-center justify-between text-xs p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-blue-500/20">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+              <span class="font-medium text-slate-700 dark:text-slate-200">B31 (Doença Comum)</span>
+            </div>
+            <div class="font-bold text-blue-600 dark:text-blue-400" id="detalheB31Txt">0 (0%)</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- SEÇÃO 4: CLASSIFICAÇÃO DE DOENÇAS GERAL (CID) -->
+    <section class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl transition">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 gap-2">
+        <div>
+          <h2 class="text-sm font-bold text-slate-900 dark:text-white tracking-wide uppercase flex items-center gap-2">
+            <i class="ph-bold ph-heartbeat text-rose-500"></i>
+            Classificação Geral por Doença (Grupos CID)
+          </h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Distribuição etiológica de todos os colaboradores com afastamento ativo</p>
+        </div>
+        <span class="text-xs font-semibold text-rose-600 dark:text-rose-400" id="doencaMaisFrequenteTxt">Maior Incidência: --</span>
+      </div>
+
+      <div class="relative w-full h-[240px] pt-4">
+        <canvas id="chartDoencas"></canvas>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SEÇÃO 5: FLUXO MENSAL DETALHADO (ENTRADAS VS SAÍDAS POR SHOP, DOENÇA E MÊS) -->
+    <!-- ========================================================================= -->
+    <section class="bg-white dark:bg-slate-900 border-2 border-blue-500/30 rounded-2xl p-5 shadow-md dark:shadow-2xl transition space-y-6">
+      
+      <!-- Topo do Módulo com Seletor do Mês de Referência -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+              <i class="ph-bold ph-arrows-left-right text-xl"></i>
+            </span>
+            <h2 class="text-base font-bold text-slate-900 dark:text-white tracking-wide uppercase">
+              Balanço Mensal: Entradas vs Saídas do INSS
+            </h2>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Análise detalhada por <strong>Mês</strong>, <strong>Shop</strong> e <strong>Doença (CID)</strong> causadora da movimentação
+          </p>
+        </div>
+
+        <!-- Seletor Interativo do Mês para Filtrar o Fluxo -->
+        <div class="flex flex-wrap items-center gap-3">
+          <label class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+            <i class="ph-bold ph-calendar text-blue-500"></i> Mês de Análise:
+          </label>
+          <select id="selectMesFluxo" onchange="renderFluxoMensal()" class="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition">
+            <option value="2026-10">Outubro / 2026 (Mês Atual)</option>
+            <option value="2026-09">Setembro / 2026</option>
+            <option value="2026-08">Agosto / 2026</option>
+            <option value="2026-07">Julho / 2026</option>
+          </select>
+
+          <!-- Badges de Resumo do Mês Selecionado -->
+          <div class="flex items-center gap-2 text-xs font-semibold">
+            <span class="px-3 py-1.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20" id="badgeTotalEntradasMes">
+              Entradas: 0
+            </span>
+            <span class="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" id="badgeTotalSaidasMes">
+              Saídas: 0
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gráficos do Mês Selecionado: 1) Movimentação por Shop | 2) Doenças que Geraram as Entradas/Saídas -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- 1. Balanço por Shop no Mês Selecionado -->
+        <div class="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="ph-bold ph-buildings text-blue-500"></i> Movimentação por Shop no Mês
+            </h3>
+            <div class="flex items-center gap-3 text-[11px]">
+              <span class="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-bold">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Entrada
+              </span>
+              <span class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Retorno (Saída)
+              </span>
+            </div>
+          </div>
+          <div class="relative w-full h-[230px]">
+            <canvas id="chartFluxoMes"></canvas>
+          </div>
+        </div>
+
+        <!-- 2. Doenças que mais geraram Entradas vs Saídas no Mês -->
+        <div class="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="ph-bold ph-stethoscope text-purple-500"></i> Doenças Causadoras da Movimentação
+            </h3>
+            <span class="text-[11px] text-slate-500 dark:text-slate-400">Classificação CID</span>
+          </div>
+          <div class="relative w-full h-[230px]">
+            <canvas id="chartDoencasFluxo"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SEÇÃO 6: INSIGHTS ANALÍTICOS & DIAGNÓSTICO DO MÊS (POSTO x SHOP x DOENÇA) -->
+    <!-- ========================================================================= -->
+    <section class="space-y-6">
+
+      <!-- Cabeçalho do Módulo de Insights -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800 gap-2">
+        <div class="flex items-center gap-2">
+          <span class="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+            <i class="ph-bold ph-lightbulb-filament text-xl"></i>
+          </span>
+          <div>
+            <h2 class="text-base font-bold text-slate-900 dark:text-white uppercase tracking-wide">
+              Insights Analíticos & Diagnóstico do Mês
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Cruzamento preditivo e causal entre Posto de Trabalho (Direto/Semidireto/Indireto), Shop e Etiologia da Doença
+            </p>
+          </div>
+        </div>
+        <span class="text-xs px-3 py-1 rounded-full font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" id="insightMesReferenciaBadge">
+          Ref: Outubro/2026
+        </span>
+      </div>
+
+      <!-- 1. Grid de Cartões de Severidade e Diagnósticos Críticos -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="cardsInsightsContainer">
+        
+        <!-- Card 1: Ponto Crítico Ergonômico -->
+        <div class="bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-500/30 p-4 rounded-2xl shadow-sm dark:shadow-lg flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center gap-1">
+                <i class="ph-bold ph-warning-octagon"></i> Alerta Alto Ergonômico
+              </span>
+              <i class="ph-bold ph-bone text-rose-500 text-lg"></i>
+            </div>
+            <h4 class="text-sm font-bold text-slate-900 dark:text-white">Linha Direta × Osteomuscular</h4>
+            <p class="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed" id="insightErgonomiaTxt">
+              Concentração expressiva de novas concessões B91 na <strong>Montagem/Trim</strong> por sobrecarga em coluna lombar e membros superiores.
+            </p>
+          </div>
+          <div class="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex items-center justify-between">
+            <span>Risco FAP Direto</span>
+            <span id="insightErgoDado">4 entradas B91</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Atenção Psicossocial -->
+        <div class="bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-500/30 p-4 rounded-2xl shadow-sm dark:shadow-lg flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                <i class="ph-bold ph-warning"></i> Atenção Psicossocial
+              </span>
+              <i class="ph-bold ph-brain text-amber-500 text-lg"></i>
+            </div>
+            <h4 class="text-sm font-bold text-slate-900 dark:text-white">Indireto/Adm × Saúde Mental</h4>
+            <p class="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed" id="insightMentalTxt">
+              Postos Indiretos (Escritório) e Semidiretos com alta incidência de afastamentos por <strong>Burnout e Ansiedade</strong> (predomínio B31).
+            </p>
+          </div>
+          <div class="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center justify-between">
+            <span>Tempo Médio Elevado</span>
+            <span id="insightMentalDado">2 concessões</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Segurança Operacional & Traumas -->
+        <div class="bg-white dark:bg-slate-900 border border-purple-300 dark:border-purple-500/30 p-4 rounded-2xl shadow-sm dark:shadow-lg flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 flex items-center gap-1">
+                <i class="ph-bold ph-shield-warning"></i> Trauma / Mecânico
+              </span>
+              <i class="ph-bold ph-first-aid text-purple-500 text-lg"></i>
+            </div>
+            <h4 class="text-sm font-bold text-slate-900 dark:text-white">Estamparia / Logística</h4>
+            <p class="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed" id="insightTraumaTxt">
+              Registros pontuais de traumas agudos e entorses em operadores diretos e operadores de empilhadeira/suporte logístico.
+            </p>
+          </div>
+          <div class="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-purple-600 dark:text-purple-400 flex items-center justify-between">
+            <span>Impacto Imediato</span>
+            <span id="insightTraumaDado">2 ocorrências B91</span>
+          </div>
+        </div>
+
+        <!-- Card 4: Retornos Positivos / Reabilitação -->
+        <div class="bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-500/30 p-4 rounded-2xl shadow-sm dark:shadow-lg flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                <i class="ph-bold ph-trend-up"></i> Retornos & Reabilitação
+              </span>
+              <i class="ph-bold ph-check-circle text-emerald-500 text-lg"></i>
+            </div>
+            <h4 class="text-sm font-bold text-slate-900 dark:text-white">Aderência de Retorno</h4>
+            <p class="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed" id="insightRetornosTxt">
+              Saídas consistentes do INSS em casos de osteomusculares antigos na Logística e Funilaria, viabilizando recolocação com restrição.
+            </p>
+          </div>
+          <div class="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+            <span>Saldo Mitigador</span>
+            <span id="insightRetornoDado">4 colaboradores</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 2. Matriz de Cruzamento Analítico (Posto de Trabalho x Grupo de Doença x Fluxo) -->
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl transition">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 gap-2">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <i class="ph-bold ph-squares-four text-blue-500"></i>
+              Matriz Analítica de Risco: Posto de Trabalho × Grupo de Patologia
+            </h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Mapeamento do volume de Entradas (novas baixas) e Saídas (retornos de benefício) agrupados por perfil funcional
+            </p>
+          </div>
+          <div class="flex items-center gap-4 text-xs font-semibold">
+            <span class="flex items-center gap-1 text-rose-600 dark:text-rose-400"><i class="ph-bold ph-arrow-up-right"></i> Entradas</span>
+            <span class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><i class="ph-bold ph-arrow-down-right"></i> Saídas</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4" id="matrizCruzamentoContainer">
+          <!-- Gerado via JS dinamicamente com base no mês selecionado -->
+        </div>
+      </div>
+
+      <!-- 3. Plano de Ação Recomendado / Direcionamento Preventivo -->
+      <div class="bg-gradient-to-r from-blue-500/5 via-slate-50 to-purple-500/5 dark:from-slate-900 dark:via-slate-900 dark:to-slate-850 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl">
+        <div class="flex items-center gap-2 mb-3">
+          <i class="ph-bold ph-compass text-blue-500 text-lg"></i>
+          <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">
+            Direcionamentos Preventivos Recomendados pelo SESMT & Medicina do Trabalho
+          </h3>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          
+          <div class="p-3.5 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1.5">
+            <div class="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+              <i class="ph-bold ph-wrench"></i> 1. Chão de Fábrica (Direto)
+            </div>
+            <p class="text-slate-600 dark:text-slate-300 leading-relaxed">
+              Auditoria de pausas ergonômicas e rodízio de postos na <strong>Montagem e Estamparia</strong> para alívio lombar imediato e redução do risco B91.
+            </p>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1.5">
+            <div class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+              <i class="ph-bold ph-chat-circle-dots"></i> 2. Escritório & Suporte (Indireto)
+            </div>
+            <p class="text-slate-600 dark:text-slate-300 leading-relaxed">
+              Implementação de programa de escuta psicossocial e adequação de carga de trabalho para conter o avanço de afastamentos por <strong>Burnout/Ansiedade</strong>.
+            </p>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1.5">
+            <div class="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+              <i class="ph-bold ph-arrows-clockwise"></i> 3. Gestão de Reabilitação
+            </div>
+            <p class="text-slate-600 dark:text-slate-300 leading-relaxed">
+              Acompanhamento médico no ASO de Retorno ao Trabalho com plano de readaptação funcional gradual para evitar recaídas imediatas em 60 dias.
+            </p>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- RODAPÉ -->
+  <footer class="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-4 px-4 text-center text-xs text-slate-500 transition-colors mt-8">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+        <span>Dashboard de Absenteísmo e Afastamentos Ocupacionais (Standalone)</span>
+      </div>
+      <div>Execução local no VS Code & Navegador Web • Sem dependência de Python ou servidor</div>
+    </div>
+  </footer>
+
+  <!-- ======================================================== -->
+  <!-- JAVASCRIPT: LÓGICA, DADOS, ALTERNÂNCIA DE TEMA E CHARTS  -->
+  <!-- ======================================================== -->
+  <script>
+    /*
+      ==========================================================================
+      ESTRUTURA DE COLUNAS CONFORME A SUA PLANILHA:
+      - matricula
+      - nome
+      - shop
+      - status afastamentos
+      - classificacao do afastamento (ex: B91 - Acidentário, B31 - Comum)
+      - codigo
+      - data de afastamento
+      - previsao de cessaçao
+      - data admissao
+      - cargo
+      - cid (ex: M54.5, F43.1, S62)
+      - descricao
+      - type (Direto, Semidireto, Indireto)
+      ==========================================================================
+    */
+
+    let rawDataset = [
+      // AGOSTO / 2026 - ENTRADAS RECENTES
+      { id: 1, matricula: "BR-1042", nome: "Carlos Eduardo Silva", shop: "Montagem/Trim", statusAfastamento: "Afastado", beneficio: "B91", vinculo: "Direto", cargo: "Operador de Montagem I", cid: "M54.5", cidGrupo: "M - Osteomuscular", cidDesc: "Dor lombar baixa (Lombalgia)", dataAfastamento: "2026-08-03", previsaoCessacao: "2026-11-05", dataAdmissao: "2021-03-10", mesEvento: "2026-08", statusMes: "ENTRADA_MES" },
+      { id: 2, matricula: "BR-6721", nome: "Aline Cristina Dias", shop: "Escritório/G&A", statusAfastamento: "Afastado", beneficio: "B31", vinculo: "Indireto", cargo: "Analista Financeiro Pleno", cid: "F43.1", cidGrupo: "F - Transtornos Mentais", cidDesc: "Estado de estresse pós-traumático / Burnout", dataAfastamento: "2026-08-05", previsaoCessacao: "2026-10-15", dataAdmissao: "2019-07-22", mesEvento: "2026-08", statusMes: "ENTRADA_MES" },
+      { id: 3, matricula: "BR-7819", nome: "Lucas Albuquerque", shop: "Montagem/Trim", statusAfastamento: "Afastado", beneficio: "B91", vinculo: "Direto", cargo: "Operador de Linha Especializado", cid: "M77.1", cidGrupo: "M - Osteomuscular", cidDesc: "Epicondilite lateral de cotovelo", dataAfastamento: "2026-08-08", previsaoCessacao: "2026-11-20", dataAdmissao: "2022-01-14", mesEvento: "2026-08", statusMes: "ENTRADA_MES" },
+      { id: 4, matricula: "BR-7224", nome: "Fabio Henrique Costa", shop: "Estamparia", statusAfastamento: "Afastado", beneficio: "B91", vinculo: "Direto", cargo: "Operador de Prensa Pesada", cid: "S62.6", cidGrupo: "S/T - Traumas/Acidentes", cidDesc: "Fratura de falange da mão", dataAfastamento: "2026-08-12", previsaoCessacao: "2026-10-30", dataAdmissao: "2020-05-18", mesEvento: "2026-08", statusMes: "ENTRADA_MES" },
+      { id: 5, matricula: "BR-5990", nome: "Amanda Faria", shop: "Logística", statusAfastamento: "Afastado", beneficio: "B91", vinculo: "Semidireto", cargo: "Operadora de Empilhadeira", cid: "S83.5", cidGrupo: "S/T - Traumas/Acidentes", cidDesc: "Entorse de ligamento de joelho", dataAfastamento: "2026-08-16", previsaoCessacao: "2026-11-30", dataAdmissao: "2023-04-02", mesEvento: "2026-08", statusMes: "ENTRADA_MES" },
+      { id: 6, matricula: "BR-9334", nome: "Eliane Brandão", shop: "Pintura", statusAfastamento: "Afastado", beneficio: "B91", vinculo: "Direto", cargo: "Operadora de Cabine de Selante", cid: "M76.5", cidGrupo: "M - Osteomuscular", cidDesc: "Tendinite patelar", dataAfastamento: "2026-08-20", previsaoCessacao: "2026-12-10", dataAdmissao: "2018-11-09", mesEvento: "2026-08", statusMes: "ENTRADA_MES" },
+
+      // AGOSTO / 2026 - RETORNOS (SAÍDAS DO INSS)
+      { id: 7, matricula: "BR-4490", nome: "Tatiane Duarte", shop: "Logística", statusAfastamento: "Retornado", beneficio: "B31", vinculo: "Semidireto", cargo: "Conferente de Peças", cid: "M54.4", cidGrupo: "M - Osteomuscular", cidDesc: "Lombociatalgia", dataAfastamento: "2025-10-15", previsaoCessacao: "2026-08-04", dataAdmissao: "2017-06-12", mesEvento: "2026-08", statusMes: "SAIDA_MES" },
+      { id: 8, matricula: "BR-5532", nome: "Rodrigo Vasconcelos", shop: "Montagem/Trim", statusAfastamento: "Retornado", beneficio: "B91", vinculo: "Direto", cargo: "Montador de Acabamento", cid: "G56.0", cidGrupo: "M - Osteomuscular", cidDesc: "Síndrome do túnel do carpo", dataAfastamento: "2026-01-10", previsaoCessacao: "2026-08-14", dataAdmissao: "2016-09-01", mesEvento: "2026-08", statusMes: "SAIDA_MES" },
+      { id: 9, matricula: "BR-3778", nome: "Camila Guimarães", shop: "Qualidade", statusAfastamento: "Retornado", beneficio: "B31", vinculo: "Semidireto", cargo: "Inspetora de Qualidade", cid: "Z54.0", cidGrupo: "Outros", cidDesc: "Convalescença pós-cirúrgica", dataAfastamento: "2026-05-15", previsaoCessacao: "2026-08-22", dataAdmissao: "2020-10-19", mesEvento: "2026-08", statusMes: "SAIDA_MES" },
+      { id: 10, matricula: "BR-1445", nome: "Sérgio Ramos", shop: "Funilaria/Body", statusAfastamento: "Retornado", beneficio: "B31", vinculo: "Direto", cargo: "Soldador de Estrutura", cid: "S53.0", cidGrupo: "S/T - Traumas/Acidentes", cidDesc: "Luxação de cotovelo", dataAfastamento: "2026-02-05", previsaoCessacao: "2026-08-28", dataAdmissao: "2015-08-11", mesEvento: "2026-08", statusMes: "SAIDA_MES" },
+
+      // JULHO / 2026
+      { id: 11, matricula: "BR-4402", nome: "Fernanda Ribeiro", shop: "Logística", statusAfastamento: "Afastado", beneficio: "B91", vinculo: "Semidireto", cargo: "Operadora Logística", cid: "S82.8", cidGrupo: "S/T - Traumas/Acidentes", cidDesc: "Fratura de tornozelo", dataAfastamento: "2026-07-02", previsaoCessacao: "2026-10-25", dataAdmissao: "2022-04-18", mesEvento: "2026-07", statusMes: "ENTRADA_MES" },
+      { id: 12, matricula: "BR-8223", nome: "Vinicius Antunes", shop: "Montagem/Trim", statusAfastamento: "Afastado", beneficio: "B91", vinculo: "Direto", cargo: "Operador de Portas", cid: "M75.1", cidGrupo: "M - Osteomuscular", cidDesc: "Síndrome do manguito rotador", dataAfastamento: "2026-07-12", previsaoCessacao: "2026-11-10", dataAdmissao: "2021-08-25", mesEvento: "2026-07", statusMes: "ENTRADA_MES" },
+      { id: 13, matricula: "BR-9445", nome: "Tiago Camargo", shop: "Motores/Powertrain", statusAfastamento: "Afastado", beneficio: "B91", vinculo: "Direto", cargo: "Operador de Usinagem", cid: "M75.5", cidGrupo: "M - Osteomuscular", cidDesc: "Bursite do ombro", dataAfastamento: "2026-07-17", previsaoCessacao: "2026-10-31", dataAdmissao: "2019-12-03", mesEvento: "2026-07", statusMes: "ENTRADA_MES" },
+      { id: 14, matricula: "BR-4001", nome: "Marcos Vinicius", shop: "Montagem/Trim", statusAfastamento: "Retornado", beneficio: "B91", vinculo: "Direto", cargo: "Montador", cid: "M54.2", cidGrupo: "M - Osteomuscular", cidDesc: "Cervicalgia", dataAfastamento: "2026-01-12", previsaoCessacao: "2026-07-20", dataAdmissao: "2020-03-15", mesEvento: "2026-07", statusMes: "SAIDA_MES" },
+
+      // CASOS HISTÓRICOS EM CURSO (ATIVOS)
+      { id: 15, matricula: "BR-2201", nome: "Mariana Souza", shop: "Pintura", statusAfastamento: "Afastado", beneficio: "B31", vinculo: "Direto", cargo: "Operadora de Pintura", cid: "F32.2", cidGrupo: "F - Transtornos Mentais", cidDesc: "Episódio depressivo grave", dataAfastamento: "2026-04-10", previsaoCessacao: "2026-11-15", dataAdmissao: "2021-06-01", mesEvento: "2026-04", statusMes: "ATIVO" },
+      { id: 16, matricula: "BR-3304", nome: "José Oliveira", shop: "Montagem/Trim", statusAfastamento: "Afastado", beneficio: "B91", vinculo: "Direto", cargo: "Montador de Chassi", cid: "M51.1", cidGrupo: "M - Osteomuscular", cidDesc: "Transtorno de disco lombar", dataAfastamento: "2026-05-18", previsaoCessacao: "2026-12-01", dataAdmissao: "2018-09-12", mesEvento: "2026-05", statusMes: "ATIVO" }
+    ];
+
+    // Histórico de 12 meses consolidado
+    const historico12Meses = [
+      { mes: 'Nov/25', total: 22 },
+      { mes: 'Dez/25', total: 20 },
+      { mes: 'Jan/26', total: 25 },
+      { mes: 'Fev/26', total: 23 },
+      { mes: 'Mar/26', total: 26 },
+      { mes: 'Abr/26', total: 24 },
+      { mes: 'Mai/26', total: 28 },
+      { mes: 'Jun/26', total: 27 },
+      { mes: 'Jul/26', total: 29 },
+      { mes: 'Ago/26', total: 31 }, // Destaque últimos 3 meses
+      { mes: 'Set/26', total: 32 }, // Destaque últimos 3 meses
+      { mes: 'Out/26', total: 30 }  // Destaque últimos 3 meses
+    ];
+
+    // Variáveis globais para os gráficos do Chart.js
+    let chartEvolucaoInstance = null;
+    let chartVinculoInstance = null;
+    let chartShopsInstance = null;
+    let chartBeneficioInstance = null;
+    let chartDoencasInstance = null;
+    let chartFluxoMesInstance = null;
+    let chartDoencasFluxoInstance = null;
+
+    // Gerenciamento de Tema (Claro / Escuro)
+    function initTheme() {
+      const savedTheme = localStorage.getItem('theme');
+      const isDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      applyTheme(isDark);
+    }
+
+    function toggleTheme() {
+      const isCurrentlyDark = document.documentElement.classList.contains('dark');
+      applyTheme(!isCurrentlyDark);
+    }
+
+    function applyTheme(isDark) {
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+        const icon = document.getElementById('themeIcon');
+        const text = document.getElementById('themeText');
+        if (icon) icon.className = 'ph-bold ph-sun text-amber-500 text-base';
+        if (text) text.innerText = 'Modo Claro';
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+        const icon = document.getElementById('themeIcon');
+        const text = document.getElementById('themeText');
+        if (icon) icon.className = 'ph-bold ph-moon text-blue-500 text-base';
+        if (text) text.innerText = 'Modo Escuro';
+      }
+
+      updateChartThemeDefaults(isDark);
+      if (chartEvolucaoInstance) {
+        applyFilters();
+        renderFluxoMensal();
+      }
+    }
+
+    // Inicialização
+    window.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      populateFilterShops();
+      initAllCharts();
+      applyFilters();
+      renderFluxoMensal();
+      setupExcelImport();
+    });
+
+    /*
+      ==========================================================================
+      CLASSIFICADOR AUTOMÁTICO DE GRUPOS CID (PADRÃO OMS/CID-10)
+      Agrupa os códigos alfanuméricos da planilha em categorias executivas
+      ==========================================================================
+    */
+    function classificarGrupoCID(cidCode) {
+      if (!cidCode) return "Outros";
+      const clean = String(cidCode).trim().toUpperCase();
+      const initial = clean.charAt(0);
+
+      switch (initial) {
+        case 'M': return "M - Osteomuscular";
+        case 'F': return "F - Transtornos Mentais";
+        case 'S':
+        case 'T': return "S/T - Traumas/Acidentes";
+        case 'I': return "I - Cardiovasculares";
+        case 'J': return "J - Respiratório";
+        case 'K': return "K - Gastrointestinal";
+        case 'G': return "G - Sistema Nervoso";
+        case 'C':
+        case 'D': return "C/D - Neoplasias/Tumores";
+        case 'Z': return "Z - Fatores de Saúde/Contato";
+        default: return "Outros";
+      }
+    }
+
+    /*
+      ==========================================================================
+      PARSER FLEXÍVEL DE DATAS (ACEITA DD/MM/AAAA, AAAA-MM-DD OU SERIAL EXCEL)
+      ==========================================================================
+    */
+    function parseDataExcel(val) {
+      if (!val) return "";
+      if (typeof val === 'number') {
+        // Serial de data do Excel
+        const dateObj = new Date(Math.round((val - 25569) * 86400 * 1000));
+        const ano = dateObj.getUTCFullYear();
+        const mes = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+        const dia = String(dateObj.getUTCDate()).padStart(2, '0');
+        return `${ano}-${mes}-${dia}`;
+      }
+      const str = String(val).trim();
+      // Formato DD/MM/AAAA
+      if (str.includes('/')) {
+        const parts = str.split('/');
+        if (parts.length === 3) {
+          const dia = parts[0].padStart(2, '0');
+          const mes = parts[1].padStart(2, '0');
+          let ano = parts[2];
+          if (ano.length === 2) ano = "20" + ano;
+          return `${ano}-${mes}-${dia}`;
+        }
+      }
+      return str;
+    }
+
+    function extrairMesAno(dataStr) {
+      if (!dataStr) return "2026-08";
+      const parts = dataStr.split('-');
+      if (parts.length >= 2) {
+        return `${parts[0]}-${parts[1].padStart(2, '0')}`;
+      }
+      return "2026-08";
+    }
+
+    /*
+      ==========================================================================
+      NORMALIZAÇÃO DE CABEÇALHOS DE COLUNAS
+      Remove acentos, caracteres especiais e espaços para comparação flexível
+      ==========================================================================
+    */
+    function normalizarHeader(header) {
+      return String(header || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, "");
+    }
+    // LEITOR DE ARQUIVO EXCEL VIA SHEETJS (COMPATÍVEL COM A PLANILHA INFORMADA)
+    function setupExcelImport() {
+      const fileInput = document.getElementById('excelFileInput');
+      fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          try {
+            const data = new Uint8Array(evt.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+
+            // 1. Localiza a aba: Procura prioritariamente por "Planilha1", "Plan1" ou variações de "afastados"
+            let sheetNameEscolhida = workbook.SheetNames[0];
+            const nomeAlvoPrincipal = "planilha1";
+            const nomeAlvoSecundario = "plan1";
+            const nomeAlvoAfastados = "afastados";
+
+            const matchPlanilha1 = workbook.SheetNames.find(s => normalizarHeader(s) === normalizarHeader(nomeAlvoPrincipal));
+            const matchPlan1 = workbook.SheetNames.find(s => normalizarHeader(s) === normalizarHeader(nomeAlvoSecundario));
+            const matchAproximado = workbook.SheetNames.find(s => normalizarHeader(s).includes(nomeAlvoAfastados) || normalizarHeader(s).includes("inss") || normalizarHeader(s).includes("agosto"));
+
+            if (matchPlanilha1) {
+              sheetNameEscolhida = matchPlanilha1;
+            } else if (matchPlan1) {
+              sheetNameEscolhida = matchPlan1;
+            } else if (matchAproximado) {
+              sheetNameEscolhida = matchAproximado;
+            }
+
+            const targetSheet = workbook.Sheets[sheetNameEscolhida];
+            const rawJson = XLSX.utils.sheet_to_json(targetSheet, { defval: "" });
+
+            if (rawJson && rawJson.length > 0) {
+              // Mapeamento dinâmico das chaves do objeto para suportar maiúsculas/minúsculas/acentos
+              rawDataset = rawJson.map((row, index) => {
+                // Cria dicionário indexado com chaves normalizadas
+                const rowMap = {};
+                Object.keys(row).forEach(k => {
+                  rowMap[normalizarHeader(k)] = row[k];
+                });
+
+                // Leitura das colunas informadas pelo usuário
+                const matricula = String(rowMap['matricula'] || `MAT-${1000 + index}`).trim();
+                const nome = String(rowMap['nome'] || `Colaborador ${index + 1}`).trim();
+                const shop = String(rowMap['shop'] || rowMap['area'] || "Geral").trim();
+                const statusAfastamento = String(rowMap['statusafastamentos'] || rowMap['statusafastamento'] || rowMap['status'] || "Afastado").trim();
+                const classificacaoRaw = String(rowMap['classificacaodoafastamento'] || rowMap['classificacao'] || rowMap['beneficio'] || "").toUpperCase();
+                
+                // Determina B91 vs B31
+                let beneficio = "B31";
+                if (classificacaoRaw.includes("B91") || classificacaoRaw.includes("ACIDENT")) {
+                  beneficio = "B91";
+                } else if (classificacaoRaw.includes("B31") || classificacaoRaw.includes("COMUM")) {
+                  beneficio = "B31";
+                } else if (String(rowMap['codigo'] || "").includes("91")) {
+                  beneficio = "B91";
+                }
+
+                // Datas
+                const dataAfastamento = parseDataExcel(rowMap['datadeafastamento'] || rowMap['dataafastamento'] || rowMap['datainicio'] || "");
+                const previsaoCessacao = parseDataExcel(rowMap['previsaodecessacao'] || rowMap['previsaocessacao'] || rowMap['datacessacao'] || "");
+                const dataAdmissao = parseDataExcel(rowMap['dataadmissao'] || "");
+
+                // Cargo e CID
+                const cargo = String(rowMap['cargo'] || rowMap['funcao'] || "Operador").trim();
+                const cid = String(rowMap['cid'] || "").trim().toUpperCase();
+                const cidDesc = String(rowMap['descricao'] || rowMap['descricaocid'] || rowMap['diagnostico'] || "-").trim();
+                const cidGrupo = classificarGrupoCID(cid);
+
+                // Type (Vínculo Operacional: Direto, Semidireto, Indireto)
+                let typeRaw = String(rowMap['type'] || rowMap['tipo'] || rowMap['vinculo'] || "Direto").trim().toLowerCase();
+                let vinculo = "Direto";
+                if (typeRaw.includes("semi")) vinculo = "Semidireto";
+                else if (typeRaw.includes("indireto") || typeRaw.includes("adm") || typeRaw.includes("escritorio")) vinculo = "Indireto";
+                else vinculo = "Direto";
+
+                // Determina status de movimentação no mês
+                const mesAfastamento = extrairMesAno(dataAfastamento);
+                const mesCessacao = extrairMesAno(previsaoCessacao);
+                
+                const isRetornado = statusAfastamento.toLowerCase().includes("retorn") || 
+                                    statusAfastamento.toLowerCase().includes("cess") ||
+                                    statusAfastamento.toLowerCase().includes("alta");
+
+                let mesEvento = mesAfastamento;
+                let statusMes = "ATIVO";
+
+                if (isRetornado) {
+                  statusMes = "SAIDA_MES";
+                  mesEvento = mesCessacao || "2026-08";
+                } else if (mesAfastamento === "2026-08" || mesAfastamento.startsWith("2026")) {
+                  statusMes = "ENTRADA_MES";
+                  mesEvento = mesAfastamento;
+                }
+
+                return {
+                  id: index + 1,
+                  matricula,
+                  nome,
+                  shop,
+                  statusAfastamento,
+                  beneficio,
+                  vinculo,
+                  cargo,
+                  cid,
+                  cidGrupo,
+                  cidDesc,
+                  dataAfastamento,
+                  previsaoCessacao,
+                  dataAdmissao,
+                  mesEvento,
+                  statusMes
+                };
+              });
+
+              // Atualiza os Dropdowns de Filtro com base nos novos dados
+              const shopSelect = document.getElementById('filterShop');
+              shopSelect.innerHTML = '<option value="ALL">Todos os Shops (Planta Global)</option>';
+              populateFilterShops();
+
+              // Atualiza seletor de mês de fluxo caso existam meses diferentes
+              atualizarSeletorMesesFluxo();
+
+              // Recalcula KPIs e gráficos
+              applyFilters();
+              renderFluxoMensal();
+
+              const badge = document.getElementById('dataBadge');
+              badge.classList.remove('hidden');
+              document.getElementById('dataBadgeText').innerText = `Carregado: "${file.name}" (Aba: ${sheetNameEscolhida}) • ${rawDataset.length} linhas`;
+            }
+          } catch (error) {
+            console.error("Erro ao ler Excel:", error);
+            const badge = document.getElementById('dataBadge');
+            badge.classList.remove('hidden');
+            document.getElementById('dataBadgeText').innerText = "Erro ao ler a aba Planilha1 do arquivo";
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    // Atualiza opções do select de meses de fluxo com base no dataset carregado
+    function atualizarSeletorMesesFluxo() {
+      const selectMes = document.getElementById('selectMesFluxo');
+      const mesesDisponiveis = [...new Set(rawDataset.map(d => d.mesEvento).filter(Boolean))].sort().reverse();
+      
+      if (mesesDisponiveis.length > 0) {
+        selectMes.innerHTML = "";
+        mesesDisponiveis.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m;
+          const [ano, mes] = m.split('-');
+          const nomesMeses = {
+            '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+            '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+            '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+          };
+          opt.textContent = `${nomesMeses[mes] || mes} / ${ano}`;
+          selectMes.appendChild(opt);
+        });
+      }
+    }
+
+    function updateChartThemeDefaults(isDark) {
+      const textColor = isDark ? '#94a3b8' : '#475569';
+      const gridColor = isDark ? 'rgba(51, 65, 85, 0.3)' : 'rgba(203, 213, 225, 0.6)';
+      
+      Chart.defaults.color = textColor;
+      Chart.defaults.borderColor = gridColor;
+      Chart.defaults.font.family = 'Inter';
+    }
+
+    function getThemeColors() {
+      const isDark = document.documentElement.classList.contains('dark');
+      return {
+        isDark,
+        text: isDark ? '#94a3b8' : '#475569',
+        title: isDark ? '#f8fafc' : '#0f172a',
+        grid: isDark ? 'rgba(51, 65, 85, 0.3)' : 'rgba(226, 232, 240, 0.8)',
+        tooltipBg: isDark ? '#0f172a' : '#ffffff',
+        tooltipText: isDark ? '#f8fafc' : '#0f172a',
+        tooltipBorder: isDark ? '#334155' : '#cbd5e1',
+        historyBar: isDark ? 'rgba(71, 85, 105, 0.5)' : 'rgba(148, 163, 184, 0.6)',
+        historyBorder: isDark ? '#334155' : '#94a3b8'
+      };
+    }
+
+    // Popula o Dropdown de Shops
+    function populateFilterShops() {
+      const shopSelect = document.getElementById('filterShop');
+      const uniqueShops = [...new Set(rawDataset.map(d => d.shop))].sort();
+      
+      uniqueShops.forEach(shop => {
+        const opt = document.createElement('option');
+        opt.value = shop;
+        opt.textContent = shop;
+        shopSelect.appendChild(opt);
+      });
+    }
+
+    function resetFilters() {
+      document.getElementById('filterShop').value = "ALL";
+      document.getElementById('filterBeneficio').value = "ALL";
+      document.getElementById('filterVinculo').value = "ALL";
+      applyFilters();
+      renderFluxoMensal();
+    }
+
+    // Aplica os filtros principais
+    function applyFilters() {
+      const selectedShop = document.getElementById('filterShop').value;
+      const selectedBeneficio = document.getElementById('filterBeneficio').value;
+      const selectedVinculo = document.getElementById('filterVinculo').value;
+
+      const filteredData = rawDataset.filter(item => {
+        const matchShop = (selectedShop === "ALL" || item.shop === selectedShop);
+        const matchBeneficio = (selectedBeneficio === "ALL" || item.beneficio === selectedBeneficio);
+        const matchVinculo = (selectedVinculo === "ALL" || item.vinculo === selectedVinculo);
+        return matchShop && matchBeneficio && matchVinculo;
+      });
+
+      document.getElementById('filterCount').innerText = `${filteredData.length} registros`;
+
+      updateKPIs(filteredData);
+      updateMainCharts(filteredData);
+    }
+
+    // ATUALIZAÇÃO DOS KPIS
+    function updateKPIs(data) {
+      // Consideramos ativos quem não é saída
+      const ativos = data.filter(d => d.statusMes !== 'SAIDA_MES');
+      const totalAtivos = ativos.length;
+      document.getElementById('kpiTotalAtivos').innerText = totalAtivos;
+
+      const taxa = ((totalAtivos / 1200) * 100).toFixed(1);
+      document.getElementById('kpiTaxaPrevalencia').innerText = `${taxa}%`;
+
+      // Entradas no mês atual (Outubro/2026)
+      const entradas = data.filter(d => d.statusMes === 'ENTRADA_MES' && d.mesEvento === '2026-10');
+      document.getElementById('kpiEntradasMes').innerText = entradas.length;
+
+      const shopEntradaCount = {};
+      entradas.forEach(e => {
+        shopEntradaCount[e.shop] = (shopEntradaCount[e.shop] || 0) + 1;
+      });
+      let topShopEntrada = "Nenhum";
+      let maxEnt = 0;
+      for (const [s, count] of Object.entries(shopEntradaCount)) {
+        if (count > maxEnt) {
+          maxEnt = count;
+          topShopEntrada = `${s} (+${count})`;
+        }
+      }
+      document.getElementById('kpiTopShopEntrada').innerText = `Top entrada: ${topShopEntrada}`;
+
+      // Saídas no mês atual (Outubro/2026)
+      const saidas = data.filter(d => d.statusMes === 'SAIDA_MES' && d.mesEvento === '2026-10');
+      document.getElementById('kpiSaidasMes').innerText = saidas.length;
+
+      const saldo = entradas.length - saidas.length;
+      const saldoStr = saldo > 0 ? `+${saldo} expansão` : (saldo < 0 ? `${saldo} retração` : `0 estabilidade`);
+      document.getElementById('kpiSaldoMes').innerText = `Saldo líquido: ${saldoStr}`;
+
+      // Fator B91 vs B31
+      const countB91 = ativos.filter(d => d.beneficio === 'B91').length;
+      const countB31 = ativos.filter(d => d.beneficio === 'B31').length;
+      const taxaB91 = totalAtivos > 0 ? ((countB91 / totalAtivos) * 100).toFixed(1) : 0;
+      const taxaB31 = totalAtivos > 0 ? ((countB31 / totalAtivos) * 100).toFixed(1) : 0;
+
+      document.getElementById('kpiTaxaB91').innerText = `${taxaB91}%`;
+      document.getElementById('kpiB91Contagem').innerText = `${countB91} B91`;
+      document.getElementById('kpiB31Contagem').innerText = `${countB31} B31`;
+
+      document.getElementById('detalheB91Txt').innerText = `${countB91} (${taxaB91}%)`;
+      document.getElementById('detalheB31Txt').innerText = `${countB31} (${taxaB31}%)`;
+
+      // Vínculos
+      const direto = ativos.filter(d => d.vinculo === 'Direto').length;
+      const semi = ativos.filter(d => d.vinculo === 'Semidireto').length;
+      const indireto = ativos.filter(d => d.vinculo === 'Indireto').length;
+
+      document.getElementById('vinculoDiretoVal').innerText = direto;
+      document.getElementById('vinculoSemiVal').innerText = semi;
+      document.getElementById('vinculoIndiretoVal').innerText = indireto;
+
+      document.getElementById('vinculoDiretoPct').innerText = totalAtivos ? `${Math.round((direto/totalAtivos)*100)}%` : '0%';
+      document.getElementById('vinculoSemiPct').innerText = totalAtivos ? `${Math.round((semi/totalAtivos)*100)}%` : '0%';
+      document.getElementById('vinculoIndiretoPct').innerText = totalAtivos ? `${Math.round((indireto/totalAtivos)*100)}%` : '0%';
+    }
+
+    // INICIALIZAÇÃO DE TODOS OS CHARTS
+    function initAllCharts() {
+      const colors = getThemeColors();
+
+      // 1. CHART EVOLUÇÃO 12 MESES
+      const ctxEvolucao = document.getElementById('chartEvolucaoMensal').getContext('2d');
+      chartEvolucaoInstance = new Chart(ctxEvolucao, {
+        type: 'bar',
+        data: {
+          labels: historico12Meses.map(h => h.mes),
+          datasets: [{
+            label: 'Total de Afastados',
+            data: historico12Meses.map(h => h.total),
+            backgroundColor: historico12Meses.map((_, idx) => 
+              idx >= 9 ? 'rgba(245, 158, 11, 0.9)' : colors.historyBar
+            ),
+            borderColor: historico12Meses.map((_, idx) => 
+              idx >= 9 ? '#f59e0b' : colors.historyBorder
+            ),
+            borderWidth: 2,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: colors.grid } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+
+      // 2. CHART VÍNCULO OPERACIONAL
+      const ctxVinculo = document.getElementById('chartVinculo').getContext('2d');
+      chartVinculoInstance = new Chart(ctxVinculo, {
+        type: 'doughnut',
+        data: {
+          labels: ['Direto (Linha)', 'Semidireto (Suporte)', 'Indireto (Adm)'],
+          datasets: [{
+            data: [0, 0, 0],
+            backgroundColor: ['#3b82f6', '#06b6d4', '#8b5cf6'],
+            borderWidth: 3,
+            borderColor: colors.isDark ? '#0f172a' : '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '70%',
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+          }
+        }
+      });
+
+      // 3. CHART SHOPS (HORIZONTAL)
+      const ctxShops = document.getElementById('chartShops').getContext('2d');
+      chartShopsInstance = new Chart(ctxShops, {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [{
+            axis: 'y',
+            label: 'Afastados',
+            data: [],
+            backgroundColor: [],
+            borderColor: [],
+            borderWidth: 1.5,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { beginAtZero: true, grid: { color: colors.grid } },
+            y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+          }
+        }
+      });
+
+      // 4. CHART BENEFÍCIO (B91 vs B31)
+      const ctxBeneficio = document.getElementById('chartBeneficio').getContext('2d');
+      chartBeneficioInstance = new Chart(ctxBeneficio, {
+        type: 'doughnut',
+        data: {
+          labels: ['B91 (Acidentário)', 'B31 (Doença Comum)'],
+          datasets: [{
+            data: [0, 0],
+            backgroundColor: ['#f59e0b', '#3b82f6'],
+            borderWidth: 3,
+            borderColor: colors.isDark ? '#0f172a' : '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '65%',
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+          }
+        }
+      });
+
+      // 5. CHART CLASSIFICAÇÃO GERAL CID
+      const ctxDoencas = document.getElementById('chartDoencas').getContext('2d');
+      chartDoencasInstance = new Chart(ctxDoencas, {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Afastados Ativos',
+            data: [],
+            backgroundColor: '#ec4899',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: colors.grid } },
+            x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+
+      // 6. CHART FLUXO MENSAL POR SHOP
+      const ctxFluxo = document.getElementById('chartFluxoMes').getContext('2d');
+      chartFluxoMesInstance = new Chart(ctxFluxo, {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [
+            { label: 'Entradas', data: [], backgroundColor: '#f43f5e', borderRadius: 4 },
+            { label: 'Saídas (Retornos)', data: [], backgroundColor: '#10b981', borderRadius: 4 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: colors.grid } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+
+      // 7. CHART DOENÇAS NO FLUXO DO MÊS (ENTRADAS VS SAÍDAS POR PATOLOGIA)
+      const ctxDoencasFluxo = document.getElementById('chartDoencasFluxo').getContext('2d');
+      chartDoencasFluxoInstance = new Chart(ctxDoencasFluxo, {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [
+            { label: 'Novas Concessões (Entradas)', data: [], backgroundColor: 'rgba(244, 63, 94, 0.85)', borderRadius: 4 },
+            { label: 'Retornos ao Trabalho (Saídas)', data: [], backgroundColor: 'rgba(16, 185, 129, 0.85)', borderRadius: 4 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: colors.grid } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    // ATUALIZAÇÃO DOS GRÁFICOS PRINCIPAIS
+    function updateMainCharts(data) {
+      const colors = getThemeColors();
+      const ativos = data.filter(d => d.statusMes !== 'SAIDA_MES');
+      const totalAtivos = ativos.length;
+
+      // 1. Evolução Mensal - readequar cores do tema
+      chartEvolucaoInstance.data.datasets[0].backgroundColor = historico12Meses.map((_, idx) => 
+        idx >= 9 ? 'rgba(245, 158, 11, 0.9)' : colors.historyBar
+      );
+      chartEvolucaoInstance.data.datasets[0].borderColor = historico12Meses.map((_, idx) => 
+        idx >= 9 ? '#f59e0b' : colors.historyBorder
+      );
+      chartEvolucaoInstance.options.scales.y.grid.color = colors.grid;
+      chartEvolucaoInstance.update();
+
+      // 2. Vínculo Operacional
+      const direto = ativos.filter(d => d.vinculo === 'Direto').length;
+      const semi = ativos.filter(d => d.vinculo === 'Semidireto').length;
+      const indireto = ativos.filter(d => d.vinculo === 'Indireto').length;
+      chartVinculoInstance.data.datasets[0].data = [direto, semi, indireto];
+      chartVinculoInstance.data.datasets[0].borderColor = colors.isDark ? '#0f172a' : '#ffffff';
+      chartVinculoInstance.update();
+
+      // 3. Shops e destaque do maior volume
+      const shopCounts = {};
+      ativos.forEach(d => {
+        shopCounts[d.shop] = (shopCounts[d.shop] || 0) + 1;
+      });
+      const sortedShops = Object.entries(shopCounts).sort((a, b) => b[1] - a[1]);
+      const shopLabels = sortedShops.map(s => s[0]);
+      const shopValues = sortedShops.map(s => s[1]);
+      const maxVal = shopValues.length > 0 ? Math.max(...shopValues) : 0;
+      const topShop = sortedShops.length > 0 ? sortedShops[0][0] : 'Nenhum';
+
+      document.getElementById('topShopNome').innerText = `${topShop} (${maxVal})`;
+
+      const bgColors = shopValues.map(v => v === maxVal && maxVal > 0 ? 'rgba(244, 63, 94, 0.85)' : 'rgba(59, 130, 246, 0.7)');
+      const borderColors = shopValues.map(v => v === maxVal && maxVal > 0 ? '#f43f5e' : '#3b82f6');
+
+      chartShopsInstance.data.labels = shopLabels;
+      chartShopsInstance.data.datasets[0].data = shopValues;
+      chartShopsInstance.data.datasets[0].backgroundColor = bgColors;
+      chartShopsInstance.data.datasets[0].borderColor = borderColors;
+      chartShopsInstance.options.scales.x.grid.color = colors.grid;
+      chartShopsInstance.update();
+
+      renderShopSummaryList(sortedShops, totalAtivos, maxVal);
+
+      // 4. Benefício B91 vs B31
+      const countB91 = ativos.filter(d => d.beneficio === 'B91').length;
+      const countB31 = ativos.filter(d => d.beneficio === 'B31').length;
+      chartBeneficioInstance.data.datasets[0].data = [countB91, countB31];
+      chartBeneficioInstance.data.datasets[0].borderColor = colors.isDark ? '#0f172a' : '#ffffff';
+      chartBeneficioInstance.update();
+
+      // 5. CID Geral
+      const cidCounts = {};
+      ativos.forEach(d => {
+        cidCounts[d.cidGrupo] = (cidCounts[d.cidGrupo] || 0) + 1;
+      });
+      const sortedCids = Object.entries(cidCounts).sort((a, b) => b[1] - a[1]);
+      
+      chartDoencasInstance.data.labels = sortedCids.map(c => c[0]);
+      chartDoencasInstance.data.datasets[0].data = sortedCids.map(c => c[1]);
+      chartDoencasInstance.options.scales.y.grid.color = colors.grid;
+      chartDoencasInstance.update();
+
+      if (sortedCids.length > 0) {
+        document.getElementById('doencaMaisFrequenteTxt').innerText = `Maior Incidência: ${sortedCids[0][0]} (${sortedCids[0][1]} casos)`;
+      } else {
+        document.getElementById('doencaMaisFrequenteTxt').innerText = `Sem registros`;
+      }
+    }
+
+    // LISTA DE SHOPS COM PROGRESS BAR
+    function renderShopSummaryList(sortedShops, totalAtivos, maxVal) {
+      const container = document.getElementById('shopTableList');
+      container.innerHTML = "";
+
+      if (sortedShops.length === 0) {
+        container.innerHTML = `<div class="text-xs text-slate-400 py-4 text-center">Nenhum dado com os filtros atuais.</div>`;
+        return;
+      }
+
+      sortedShops.forEach(([shop, count]) => {
+        const pct = totalAtivos > 0 ? ((count / totalAtivos) * 100).toFixed(1) : 0;
+        const isCritical = (count === maxVal && maxVal > 0);
+
+        const item = document.createElement('div');
+        item.className = `p-2.5 rounded-xl border text-xs transition ${
+          isCritical 
+            ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-300 dark:border-rose-500/30' 
+            : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
+        }`;
+
+        item.innerHTML = `
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-medium ${isCritical ? 'text-rose-700 dark:text-rose-300 font-bold flex items-center gap-1' : 'text-slate-800 dark:text-slate-300'}">
+              ${isCritical ? '<i class="ph-bold ph-warning text-rose-500"></i>' : ''} ${shop}
+            </span>
+            <div class="flex items-center gap-2">
+              <span class="font-bold ${isCritical ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100'}">${count} casos</span>
+              <span class="text-slate-500 dark:text-slate-400 text-[10px] w-10 text-right">${pct}%</span>
+            </div>
+          </div>
+          <div class="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div class="h-full rounded-full ${isCritical ? 'bg-rose-500' : 'bg-blue-500'}" style="width: ${pct}%"></div>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    /*
+      ==========================================================================
+      LÓGICA DETALHADA DE FLUXO MENSAL (ENTRADAS VS SAÍDAS POR SHOP, DOENÇA E MÊS)
+      ==========================================================================
+    */
+    function renderFluxoMensal() {
+      const selectedMes = document.getElementById('selectMesFluxo').value;
+      const colors = getThemeColors();
+
+      // Pega todos os registros movimentados naquele mês (seja Entrada ou Saída)
+      const movimentosMes = rawDataset.filter(d => 
+        d.mesEvento === selectedMes && (d.statusMes === 'ENTRADA_MES' || d.statusMes === 'SAIDA_MES')
+      );
+
+      const entradas = movimentosMes.filter(d => d.statusMes === 'ENTRADA_MES');
+      const saidas = movimentosMes.filter(d => d.statusMes === 'SAIDA_MES');
+
+      // Atualiza Badges de contagem
+      document.getElementById('badgeTotalEntradasMes').innerText = `Entradas: ${entradas.length}`;
+      document.getElementById('badgeTotalSaidasMes').innerText = `Saídas: ${saidas.length}`;
+
+      // 1. Prepara gráfico de Entradas vs Saídas por Shop
+      const uniqueShops = [...new Set(rawDataset.map(d => d.shop))].sort();
+      const entradasShop = uniqueShops.map(s => entradas.filter(e => e.shop === s).length);
+      const saidasShop = uniqueShops.map(s => saidas.filter(e => e.shop === s).length);
+
+      chartFluxoMesInstance.data.labels = uniqueShops;
+      chartFluxoMesInstance.data.datasets[0].data = entradasShop;
+      chartFluxoMesInstance.data.datasets[1].data = saidasShop;
+      chartFluxoMesInstance.options.scales.y.grid.color = colors.grid;
+      chartFluxoMesInstance.update();
+
+      // 2. Prepara gráfico de Entradas vs Saídas por Doença (CID)
+      const uniqueDoencas = [...new Set(movimentosMes.map(d => d.cidGrupo))].sort();
+      const entradasDoenca = uniqueDoencas.map(cid => entradas.filter(e => e.cidGrupo === cid).length);
+      const saidasDoenca = uniqueDoencas.map(cid => saidas.filter(e => e.cidGrupo === cid).length);
+
+      chartDoencasFluxoInstance.data.labels = uniqueDoencas.length > 0 ? uniqueDoencas : ['Nenhum evento'];
+      chartDoencasFluxoInstance.data.datasets[0].data = uniqueDoencas.length > 0 ? entradasDoenca : [0];
+      chartDoencasFluxoInstance.data.datasets[1].data = uniqueDoencas.length > 0 ? saidasDoenca : [0];
+      chartDoencasFluxoInstance.options.scales.y.grid.color = colors.grid;
+      chartDoencasFluxoInstance.update();
+
+      // 3. Atualiza os Insights Analíticos e a Matriz Posto x Doença com base no mês selecionado
+      renderInsightsAnaliticos(selectedMes, movimentosMes, entradas, saidas);
+    }
+
+    /*
+      ==========================================================================
+      CÁLCULO E RENDERIZAÇÃO DOS INSIGHTS & MATRIZ DE CRUZAMENTO
+      ==========================================================================
+    */
+    function renderInsightsAnaliticos(mesKey, movimentos, entradas, saidas) {
+      const badgeRef = document.getElementById('insightMesReferenciaBadge');
+      const mesNomes = {
+        '2026-10': 'Outubro / 2026',
+        '2026-09': 'Setembro / 2026',
+        '2026-08': 'Agosto / 2026',
+        '2026-07': 'Julho / 2026'
+      };
+      if (badgeRef) {
+        badgeRef.innerText = `Ref: ${mesNomes[mesKey] || mesKey}`;
+      }
+
+      // Cálculos específicos para os diagnósticos dos cards
+      const ergoEntradas = entradas.filter(e => e.vinculo === 'Direto' && e.cidGrupo === 'M - Osteomuscular');
+      const b91Ergo = ergoEntradas.filter(e => e.beneficio === 'B91').length;
+      document.getElementById('insightErgoDado').innerText = `${ergoEntradas.length} entradas (${b91Ergo} B91)`;
+      
+      const mentalEntradas = entradas.filter(e => (e.vinculo === 'Indireto' || e.vinculo === 'Semidireto') && e.cidGrupo === 'F - Transtornos Mentais');
+      document.getElementById('insightMentalDado').innerText = `${mentalEntradas.length} concessões`;
+
+      const traumaEntradas = entradas.filter(e => e.cidGrupo === 'S/T - Traumas/Acidentes');
+      const b91Trauma = traumaEntradas.filter(e => e.beneficio === 'B91').length;
+      document.getElementById('insightTraumaDado').innerText = `${traumaEntradas.length} casos (${b91Trauma} B91)`;
+
+      document.getElementById('insightRetornoDado').innerText = `${saidas.length} retornos`;
+
+      // Render da Matriz de Cruzamento (Direto / Semidireto / Indireto)
+      const containerMatriz = document.getElementById('matrizCruzamentoContainer');
+      containerMatriz.innerHTML = "";
+
+      const perfis = [
+        {
+          nome: "Direto (Linha de Produção)",
+          icone: "ph-wrench",
+          cor: "border-blue-500/30 text-blue-600 dark:text-blue-400 bg-blue-500/5",
+          filtro: "Direto"
+        },
+        {
+          nome: "Semidireto (Logística & Qualidade)",
+          icone: "ph-forklift",
+          cor: "border-cyan-500/30 text-cyan-600 dark:text-cyan-400 bg-cyan-500/5",
+          filtro: "Semidireto"
+        },
+        {
+          nome: "Indireto (Escritório / Administrativo)",
+          icone: "ph-briefcase",
+          cor: "border-purple-500/30 text-purple-600 dark:text-purple-400 bg-purple-500/5",
+          filtro: "Indireto"
+        }
+      ];
+
+      perfis.forEach(perfil => {
+        const movPerfil = movimentos.filter(m => m.vinculo === perfil.filtro);
+        const card = document.createElement('div');
+        card.className = "p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex flex-col justify-between";
+
+        // Agrupa por doença dentro do perfil
+        const doencasNoPerfil = {};
+        movPerfil.forEach(m => {
+          if (!doencasNoPerfil[m.cidGrupo]) {
+            doencasNoPerfil[m.cidGrupo] = { entradas: 0, saidas: 0, b91: 0, b31: 0 };
+          }
+          if (m.statusMes === 'ENTRADA_MES') {
+            doencasNoPerfil[m.cidGrupo].entradas++;
+          } else if (m.statusMes === 'SAIDA_MES') {
+            doencasNoPerfil[m.cidGrupo].saidas++;
+          }
+          if (m.beneficio === 'B91') doencasNoPerfil[m.cidGrupo].b91++;
+          else doencasNoPerfil[m.cidGrupo].b31++;
+        });
+
+        const doencasKeys = Object.keys(doencasNoPerfil);
+
+        let linhasHtml = "";
+        if (doencasKeys.length === 0) {
+          linhasHtml = `<div class="text-[11px] text-slate-400 italic py-2">Sem movimentações no mês selecionado.</div>`;
+        } else {
+          linhasHtml = doencasKeys.map(dKey => {
+            const item = doencasNoPerfil[dKey];
+            return `
+              <div class="py-2 border-b border-slate-200/60 dark:border-slate-800/80 last:border-0 flex items-center justify-between text-xs">
+                <div>
+                  <div class="font-bold text-slate-800 dark:text-slate-200">${dKey}</div>
+                  <div class="text-[10px] text-slate-500 dark:text-slate-400">
+                    <span class="text-amber-600 dark:text-amber-400 font-semibold">${item.b91} B91</span> • 
+                    <span class="text-blue-600 dark:text-blue-400 font-semibold">${item.b31} B31</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                    +${item.entradas}
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    -${item.saidas}
+                  </span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+
+        const totalEnt = movPerfil.filter(m => m.statusMes === 'ENTRADA_MES').length;
+        const totalSai = movPerfil.filter(m => m.statusMes === 'SAIDA_MES').length;
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-200 dark:border-slate-700">
+              <span class="font-bold text-xs uppercase tracking-wide flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
+                <i class="ph-bold ${perfil.icone}"></i> ${perfil.nome}
+              </span>
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${perfil.cor}">
+                Saldo: ${totalEnt - totalSai > 0 ? '+' : ''}${totalEnt - totalSai}
+              </span>
+            </div>
+            <div class="space-y-1">
+              ${linhasHtml}
+            </div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+            <span>Total:</span>
+            <div class="space-x-2">
+              <span class="text-rose-600 dark:text-rose-400 font-bold">+${totalEnt} ent.</span>
+              <span class="text-emerald-600 dark:text-emerald-400 font-bold">-${totalSai} saíd.</span>
+            </div>
+          </div>
+        `;
+        containerMatriz.appendChild(card);
+      });
+    }
+
+  </script>
+
+</body>
+</html>
